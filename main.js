@@ -60,7 +60,7 @@ const tunnel     = new THREE.LineSegments(tunnelEdges, tunnelMat);
 scene.add(tunnel);
 
 /* ============================================================
-   STL-Modell
+   STL-Modell (Mit Wind-Shader-Modifikation)
    ============================================================ */
 const stlGroup = new THREE.Group();
 scene.add(stlGroup);
@@ -76,7 +76,7 @@ function loadSTLGeometry(geometry){
     stlMesh = null;
   }
 
-  // Sicherheitsprüfung: Hat das Modell überhaupt Vertices?
+  // Sicherheitsprüfung
   if (!geometry || !geometry.attributes.position || geometry.attributes.position.count === 0) {
     throw new Error("Leere oder ungültige Geometrie in der STL-Datei gefunden.");
   }
@@ -93,11 +93,9 @@ function loadSTLGeometry(geometry){
   geometry.translate(-center.x, -center.y, -center.z);
 
   const maxDim = Math.max(size.x, size.y, size.z);
-  // Verhindere Division durch Null bei flachen/defekten Modellen
   const scale = maxDim > 0 ? 12 / maxDim : 1;
   geometry.scale(scale, scale, scale);
 
-  // Nach Skalierung Bounding Box neu berechnen für Shader
   geometry.computeBoundingBox();
 
   const mat = new THREE.MeshStandardMaterial({
@@ -106,6 +104,34 @@ function loadSTLGeometry(geometry){
     roughness:0.55,
     flatShading:false,
   });
+
+  // --- SHADER MODIFIKATION: Modell im Wind flattern lassen ---
+  mat.onBeforeCompile = (shader) => {
+    shader.uniforms.uTime = shaderUniforms.uTime;
+    shader.uniforms.uWindSpeed = shaderUniforms.uWindSpeed;
+    shader.uniforms.uMin = shaderUniforms.uModelMin;
+    shader.uniforms.uMax = shaderUniforms.uModelMax;
+
+    shader.vertexShader = 'uniform float uTime;\nuniform float uWindSpeed;\nuniform vec3 uMin;\nuniform vec3 uMax;\n' + shader.vertexShader;
+    
+    shader.vertexShader = shader.vertexShader.replace(
+      '#include <begin_vertex>',
+      `
+      vec3 transformed = vec3( position );
+      
+      // Berechne, wie weit der Vertex vom Zentrum entfernt ist (0 bis 1)
+      float maxSpan = max(length(uMax.xz), length(uMin.xz));
+      float span = length(position.xz) / max(maxSpan, 0.001);
+      
+      // Wind-Flattern (Bewegung in Y-Richtung, abhängig von Zeit und Wind)
+      float flutter = sin(uTime * 15.0 * uWindSpeed + position.x * 3.0) * 0.2 * span * uWindSpeed;
+      transformed.y += flutter;
+      
+      // Aerodynamischer Widerstand (Biegung in +Z Richtung, da Wind in +Z bläst)
+      transformed.z += span * 0.5 * uWindSpeed;
+      `
+    );
+  };
 
   stlMesh = new THREE.Mesh(geometry, mat);
   stlGroup.add(stlMesh);
@@ -267,7 +293,7 @@ function buildParticles(count){
 buildParticles(30000);
 
 /* ============================================================
-   File-Upload (Mit erweitertem Fehler-Handling)
+   File-Upload
    ============================================================ */
 const fileInput   = document.getElementById('file-input');
 const fileInfo    = document.getElementById('file-info');
@@ -287,34 +313,24 @@ function handleFile(file){
   const reader = new FileReader();
 
   reader.onerror = function() {
-    fileInfo.textContent = '✗ Fehler: Datei konnte nicht gelesen werden (evtl. in Benutzung oder gesperrt).';
+    fileInfo.textContent = '✗ Fehler: Datei konnte nicht gelesen werden.';
   };
 
   reader.onload = (e) => {
     try {
       const arrayBuffer = e.target.result;
-      
-      // Prüfen, ob die Datei leer ist
       if(!arrayBuffer || arrayBuffer.byteLength === 0) {
         throw new Error("Die Datei ist leer.");
       }
-
-      // STLLoader parsen lassen
       const geometry = stlLoader.parse(arrayBuffer);
-      
-      // In unsere Szene laden
       loadSTLGeometry(geometry);
-      
       fileInfo.textContent = `✓ ${file.name} · ${(file.size/1024).toFixed(1)} KB · ${geometry.attributes.position.count} Vertices`;
-      
     } catch(err) {
       console.error("STL Parse Error:", err);
-      // Detaillierte Fehlermeldung im UI anzeigen
-      fileInfo.textContent = `✗ Fehler: ${err.message}. (Ist die Datei defekt?)`;
+      fileInfo.textContent = `✗ Fehler: ${err.message}.`;
     }
   };
 
-  // Datei als ArrayBuffer einlesen
   reader.readAsArrayBuffer(file);
 }
 
@@ -381,7 +397,7 @@ let frames = 0;
 let fpsTimer = 0;
 
 /* ============================================================
-   Animation
+   Animation (Mit Auftriebs-Physik)
    ============================================================ */
 const clock = new THREE.Clock();
 
@@ -390,9 +406,28 @@ function animate(){
   const dt = clock.getDelta();
   shaderUniforms.uTime.value += dt;
 
+  // --- AUFTRIEB & PHYSIK ---
+  if (stlGroup) {
+    const wind = shaderUniforms.uWindSpeed.value;
+    
+    // Zielposition: Hebt das Modell basierend auf dem Wind nach oben
+    const targetLift = (wind - 0.1) * 3.0; 
+    // Zielneigung: Nase geht leicht runter (oder oben, je nach Präferenz. hier Anstellwinkel)
+    const targetPitch = -wind * 0.15; 
+    
+    // Weiche Interpolation für natürliche Bewegung
+    stlGroup.position.y += (targetLift - stlGroup.position.y) * 0.05;
+    stlGroup.rotation.x += (targetPitch - stlGroup.rotation.x) * 0.05;
+    
+    // Kamera leicht mitheben lassen, damit Modell im Bild bleibt
+    const camTargetY = targetLift * 0.5;
+    controls.target.y += (camTargetY - controls.target.y) * 0.05;
+  }
+
   controls.update();
   renderer.render(scene, camera);
 
+  // FPS
   frames++;
   fpsTimer += dt;
   if(fpsTimer >= 0.5){
