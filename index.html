@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Windkanal Visualizer · WebGL</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app">
+
+    <!-- UI Panel -->
+    <aside id="ui-panel">
+      <header class="brand">
+        <div class="logo">≡</div>
+        <div>
+          <h1>Windkanal</h1>
+          <p class="subtitle">GPU Particle Flow · WebGL</p>
+        </div>
+      </header>
+
+      <section class="card">
+        <label class="upload-label" for="file-input">
+          <span class="upload-icon">⬆</span>
+          <span>
+            <strong>STL-Datei laden</strong>
+            <small>Klicken oder Datei hierher ziehen</small>
+          </span>
+          <input type="file" id="file-input" accept=".stl" hidden />
+        </label>
+        <div id="file-info" class="file-info">Kein Modell geladen</div>
+      </section>
+
+      <section class="card">
+        <h2>Parameter</h2>
+
+        <div class="control">
+          <label for="wind-speed">Windgeschwindigkeit</label>
+          <input type="range" id="wind-speed" min="0.1" max="5" step="0.1" value="1.5" />
+          <span id="wind-speed-val" class="val">1.5</span>
+        </div>
+
+        <div class="control">
+          <label for="particle-count">Partikelanzahl</label>
+          <input type="range" id="particle-count" min="1000" max="80000" step="1000" value="30000" />
+          <span id="particle-count-val" class="val">30000</span>
+        </div>
+
+        <div class="control">
+          <label for="spread">Strömungsbreite</label>
+          <input type="range" id="spread" min="1" max="20" step="0.5" value="8" />
+          <span id="spread-val" class="val">8.0</span>
+        </div>
+
+        <div class="toggle-row">
+          <label class="switch">
+            <input type="checkbox" id="deflect" checked />
+            <span class="slider"></span>
+          </label>
+          <span>Modell-Ablenkung</span>
+        </div>
+
+        <div class="toggle-row">
+          <label class="switch">
+            <input type="checkbox" id="auto-rotate" />
+            <span class="slider"></span>
+          </label>
+          <span>Modell rotieren</span>
+        </div>
+      </section>
+
+      <section class="card legend">
+        <h2>Legende</h2>
+        <div class="legend-row"><span class="dot slow"></span> langsame Strömung</div>
+        <div class="legend-row"><span class="dot fast"></span> schnelle Strömung</div>
+      </section>
+
+      <footer class="hint">
+        Linksklick + Ziehen: Rotieren · Scrollen: Zoom
+      </footer>
+    </aside>
+
+    <!-- 3D Canvas -->
+    <main id="viewport">
+      <canvas id="scene"></canvas>
+      <div id="hud-topright">
+        <div class="hud-stat"><span>FPS</span><b id="fps">–</b></div>
+        <div class="hud-stat"><span>Partikel</span><b id="particle-hud">0</b></div>
+      </div>
+      <div id="drop-overlay">STL-Datei hier loslassen</div>
+    </main>
+
+  </div>
+
+  <!-- Three.js via Import Map (ES Modules) -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+  <script type="module" src="main.js"></script>
+</body>
+</html>
