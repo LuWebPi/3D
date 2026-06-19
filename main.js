@@ -61,7 +61,8 @@ scene.add(tunnel);
 
 /* ============================================================
    STL-Modell
-   ============================================================ const stlGroup = new THREE.Group();
+   ============================================================ */
+const stlGroup = new THREE.Group();
 scene.add(stlGroup);
 
 let stlMesh = null;
@@ -297,7 +298,8 @@ function handleFile(file){
       fileInfo.textContent = `✓ ${file.name} · ${(file.size/1024).toFixed(1)} KB · ${geometry.attributes.position.count} Vertices`;
     }catch(err){
       console.error(err);
-      fileInfo.textContent = '✗ Fehler beim Parsen der STL-Datei';
+      // Zeige den genauen Fehler an, falls doch mal etwas schiefgeht
+      fileInfo.textContent = `✗ Fehler: ${err.message}`;
     }
   };
   reader.readAsArrayBuffer(file);
